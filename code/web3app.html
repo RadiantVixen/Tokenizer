@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vision42Token DApp</title>
+  <style>
+    body { font-family: Arial; padding: 20px; max-width: 600px; margin: auto; }
+    input, button { margin: 5px 0; padding: 5px; width: 100%; }
+    button { cursor: pointer; }
+    #walletAddress { font-weight: bold; }
+    .section { border: 1px solid #ddd; padding: 15px; margin: 15px 0; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Vision42Token DApp</h1>
+
+  <div class="section">
+    <p>Connected Wallet: <span id="walletAddress">Not connected</span></p>
+    <button id="connectWallet">Connect Wallet</button>
+  </div>
+
+  <div class="section">
+    <h2>Your Balance</h2>
+    <p>Balance: <span id="myBalance">0</span> V42</p>
+    <button id="refreshBalance">Refresh Balance</button>
+  </div>
+
+  <div class="section">
+    <h2>Mint Tokens</h2>
+    <input type="text" id="mintAddress" placeholder="Recipient address">
+    <input type="number" id="mintAmount" placeholder="Amount">
+    <button id="mintButton">Mint</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script>
+    (async function() {
+      const contractAddress = "0x2cFC28FDC0fB80271BC36Ff05f74c0fB71a2A3a4";
+      const contractABI = [{"inputs":[{"internalType":"uint256","name":"initialSupply","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"allowance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"}],"name":"ERC20InsufficientAllowance","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"uint256","name":"balance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"}],"name":"ERC20InsufficientBalance","type":"error"},{"inputs":[{"internalType":"address","name":"approver","type":"address"}],"name":"ERC20InvalidApprover","type":"error"},{"inputs":[{"internalType":"address","name":"receiver","type":"address"}],"name":"ERC20InvalidReceiver","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"}],"name":"ERC20InvalidSender","type":"error"},{"inputs":[{"internalType":"address","name":"spender","type":"address"}],"name":"ERC20InvalidSpender","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}];
+
+      let provider, signer, contract, walletAddress;
+
+      const SEPOLIA_CHAIN_ID = "0xaa36a7";
+
+      async function connectWallet() {
+        if (!window.ethereum) return alert("MetaMask not found!");
+        try {
+          // Switch to Sepolia if not already on it
+          const chainId = await window.ethereum.request({ method: "eth_chainId" });
+          if (chainId !== SEPOLIA_CHAIN_ID) {
+            try {
+              await window.ethereum.request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: SEPOLIA_CHAIN_ID }],
+              });
+            } catch (switchErr) {
+              return alert("Please switch MetaMask to the Sepolia testnet and try again.");
+            }
+          }
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+          await provider.send("eth_requestAccounts", []);
+          signer = provider.getSigner();
+          walletAddress = await signer.getAddress();
+          document.getElementById("walletAddress").innerText = walletAddress;
+          contract = new ethers.Contract(contractAddress, contractABI, signer);
+          refreshBalance();
+        } catch (err) {
+          console.error(err);
+          alert("Connection error: " + err.message);
+        }
+      }
+
+      async function refreshBalance() {
+        if (!contract) return alert("Connect wallet first!");
+        try {
+          const addr = await signer.getAddress();
+          const balance = await contract.balanceOf(addr);
+          document.getElementById("myBalance").innerText = ethers.utils.formatUnits(balance, 18);
+        } catch (err) {
+          console.error(err);
+          alert("Error fetching balance: " + err.message);
+        }
+      }
+
+      async function mintTokens() {
+        if (!contract) return alert("Connect wallet first!");
+        const to = document.getElementById("mintAddress").value;
+        const amount = document.getElementById("mintAmount").value;
+        if (!to || !amount) return alert("Enter valid address and amount!");
+        try {
+          const parsedAmount = ethers.utils.parseUnits(amount, 18);
+          const tx = await contract.mint(to, parsedAmount);
+          await tx.wait();
+          alert(`Minted ${amount} V42 to ${to}`);
+          refreshBalance();
+        } catch (err) {
+          console.error(err);
+          alert("Error: " + err.message);
+        }
+      }
+
+      document.getElementById("connectWallet").onclick = connectWallet;
+      document.getElementById("refreshBalance").onclick = refreshBalance;
+      document.getElementById("mintButton").onclick = mintTokens;
+    })();
+  </script>
+</body>
+</html>
